@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>ぽかぽか もぐらたたき</title>
+<style>
+  :root {
+    --sky1: #aee9ff;
+    --sky2: #d6f5ff;
+    --panel: #fff7e6;
+    --ink: #5a3a1b;
+    --accent: #ff7a59;
+    --accent2: #ffd23f;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: linear-gradient(180deg, var(--sky1), var(--sky2));
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* じょうぶ（スコアやのこりじかん） */
+  #hud {
+    width: min(94vw, 560px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .badge {
+    background: var(--panel);
+    border: 4px solid #fff;
+    border-radius: 18px;
+    padding: 6px 14px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+    min-width: 96px;
+  }
+  .badge .label { font-size: 13px; opacity: 0.7; }
+  .badge .value { font-size: 26px; }
+  #time-badge .value { color: var(--accent); }
+  #score-badge .value { color: #2e9e5b; }
+
+  #sound-btn {
+    background: var(--panel);
+    border: 4px solid #fff;
+    border-radius: 50%;
+    width: 52px;
+    height: 52px;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+    flex: none;
+  }
+  #sound-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.12); }
+
+  /* ゲームがめん */
+  #stage {
+    position: relative;
+    width: min(94vw, 560px);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 26px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    background: #bfe66a;
+    touch-action: manipulation;
+    cursor: crosshair;
+  }
+
+  /* オーバーレイ（すたーと／けっか） */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: rgba(255,255,255,0.55);
+    border-radius: 26px;
+    backdrop-filter: blur(2px);
+    text-align: center;
+    padding: 16px;
+  }
+  .overlay.hidden { display: none; }
+
+  .title {
+    font-size: clamp(30px, 8vw, 52px);
+    font-weight: 900;
+    color: var(--ink);
+    text-shadow: 0 3px 0 #fff, 0 6px 0 rgba(0,0,0,0.08);
+    margin: 0;
+    letter-spacing: 1px;
+  }
+  .subtitle {
+    font-size: clamp(15px, 4vw, 20px);
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 10px 18px;
+    line-height: 1.6;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.08);
+  }
+  .result-score {
+    font-size: clamp(40px, 11vw, 72px);
+    font-weight: 900;
+    color: var(--accent);
+    text-shadow: 0 3px 0 #fff;
+    margin: 0;
+  }
+  .result-line { font-size: clamp(16px, 4.5vw, 22px); font-weight: 800; }
+  .praise { font-size: clamp(20px, 5.5vw, 28px); font-weight: 900; color: #2e9e5b; }
+
+  .big-btn {
+    border: none;
+    background: linear-gradient(180deg, #ffd23f, #ffb01f);
+    color: #6b3b00;
+    font-size: clamp(24px, 6.5vw, 34px);
+    font-weight: 900;
+    padding: 16px 44px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 7px 0 #d98a00, 0 12px 18px rgba(0,0,0,0.18);
+    transition: transform .05s ease, box-shadow .05s ease;
+  }
+  .big-btn:active { transform: translateY(4px); box-shadow: 0 3px 0 #d98a00, 0 6px 10px rgba(0,0,0,0.18); }
+
+  .hint {
+    font-size: clamp(13px, 3.6vw, 16px);
+    opacity: 0.85;
+  }
+
+  footer {
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: 0.65;
+  }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div class="badge" id="time-badge">
+        <div class="label">のこり じかん</div>
+        <div class="value"><span id="time">30</span></div>
+      </div>
+      <button id="sound-btn" title="おと">🔊</button>
+      <div class="badge" id="score-badge">
+        <div class="label">てんすう</div>
+        <div class="value" id="score">0</div>
+      </div>
+    </div>
+
+    <div id="stage">
+      <canvas id="game" width="600" height="640" aria-label="もぐらたたき"></canvas>
+
+      <!-- すたーとがめん -->
+      <div class="overlay" id="start-screen">
+        <h1 class="title">ぽかぽか<br>もぐらたたき</h1>
+        <div class="subtitle">もぐらを タップ！<br>たくさん たたいて てんすうを ためよう</div>
+        <button class="big-btn" id="start-btn">すたーと</button>
+        <div class="hint">きんいろの もぐらは ボーナス！</div>
+      </div>
+
+      <!-- けっかがめん -->
+      <div class="overlay hidden" id="result-screen">
+        <div class="result-line">きみの てんすう</div>
+        <p class="result-score" id="final-score">0</p>
+        <div class="praise" id="praise">よくできました！</div>
+        <div class="result-line">ハイスコア <span id="high-score">0</span></div>
+        <button class="big-btn" id="retry-btn">もういちど</button>
+      </div>
+    </div>
+
+    <footer>そうさ：もぐらを クリック／タップ ・ キーボードの 1〜9 でも あそべるよ</footer>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ====== きほんせってい ======================================================
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;   // ないぶかいぞうど（よこ）
+  const H = canvas.height;  // ないぶかいぞうど（たて）
+
+  const GAME_TIME = 30;     // びょう
+  const COLS = 3, ROWS = 3; // あなの ならび（3×3）
+
+  // ====== あなの ばしょを けいさん =============================================
+  const holes = [];
+  (() => {
+    const marginX = 90, marginY = 150;
+    const gapX = (W - marginX * 2) / (COLS - 1);
+    const gapY = (H - marginY - 110) / (ROWS - 1);
+    const rx = 78, ry = 34; // あなの おおきさ（だえん）
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        holes.push({
+          x: marginX + gapX * c,
+          y: marginY + gapY * r,
+          rx, ry,
+          mole: null, // {kind, t, life, state}
+        });
+      }
+    }
+  })();
+
+  // ====== ゲームの じょうたい ==================================================
+  const STATE = { READY: "ready", PLAYING: "playing", OVER: "over" };
+  let state = STATE.READY;
+  let score = 0;
+  let timeLeft = GAME_TIME;
+  let highScore = loadHighScore();
+  let spawnTimer = 0;
+  let lastTs = 0;
+  let timerAcc = 0;
+  const effects = [];     // たたいた ときの えんしゅつ
+  const hammer = { x: W / 2, y: H / 2, swing: 0, visible: false };
+
+  // ====== サウンド（Web Audio で がっせい・ちょさくけんフリー）=================
+  let audioCtx = null;
+  let soundOn = true;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+
+  function tone(freq, dur, type = "sine", vol = 0.2, when = 0) {
+    if (!soundOn || !audioCtx) return;
+    const t0 = audioCtx.currentTime + when;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  function noiseBurst(dur = 0.12, vol = 0.25) {
+    if (!soundOn || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const n = Math.floor(audioCtx.sampleRate * dur);
+    const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(vol, t0);
+    src.buffer = buf;
+    src.connect(gain).connect(audioCtx.destination);
+    src.start(t0);
+  }
+
+  const sfx = {
+    pop()   { tone(660, 0.12, "sine", 0.15); },
+    whack() { noiseBurst(0.10, 0.25); tone(180, 0.18, "square", 0.18); },
+    bonus() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.16, "triangle", 0.16, i * 0.06)); },
+    miss()  { tone(150, 0.14, "sawtooth", 0.10); },
+    end()   { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, 0.22, "triangle", 0.16, i * 0.12)); },
+  };
+
+  // ====== もぐらの しゅるい =====================================================
+  // ふつう：1てん / きんいろ：3てん（でる かくりつ ひくめ）
+  function makeMole() {
+    const golden = Math.random() < 0.16;
+    return {
+      kind: golden ? "gold" : "normal",
+      points: golden ? 3 : 1,
+      t: 0,                 // けいか じかん
+      life: golden ? 0.9 : currentLife(),
+      state: "rising",      // rising → up → falling → done
+      hit: false,
+      shake: 0,
+    };
+  }
+
+  // じかんが すすむほど もぐらは はやく ひっこむ（むずかしくなる）
+  function currentLife() {
+    const progress = 1 - timeLeft / GAME_TIME; // 0→1
+    return 1.25 - progress * 0.55;             // 1.25びょう → 0.7びょう
+  }
+  function currentSpawnInterval() {
+    const progress = 1 - timeLeft / GAME_TIME;
+    return 0.78 - progress * 0.38;             // 0.78びょう → 0.4びょう
+  }
+
+  // ====== ゲームの ながれ ======================================================
+  function startGame() {
+    ensureAudio();
+    score = 0;
+    timeLeft = GAME_TIME;
+    spawnTimer = 0.3;
+    timerAcc = 0;
+    effects.length = 0;
+    holes.forEach(h => h.mole = null);
+    state = STATE.PLAYING;
+    document.getElementById("start-screen").classList.add("hidden");
+    document.getElementById("result-screen").classList.add("hidden");
+    updateHud();
+  }
+
+  function endGame() {
+    state = STATE.OVER;
+    holes.forEach(h => h.mole = null);
+    sfx.end();
+    if (score > highScore) { highScore = score; saveHighScore(highScore); }
+    document.getElementById("final-score").textContent = score;
+    document.getElementById("high-score").textContent = highScore;
+    document.getElementById("praise").textContent = praiseFor(score);
+    document.getElementById("result-screen").classList.remove("hidden");
+  }
+
+  function praiseFor(s) {
+    if (s >= 40) return "もぐらマスター！🏆";
+    if (s >= 25) return "すごい！てんさい！⭐";
+    if (s >= 12) return "じょうずだね！😊";
+    return "よくできました！🎉";
+  }
+
+  function spawnMole() {
+    const empty = holes.filter(h => !h.mole);
+    if (empty.length === 0) return;
+    const h = empty[(Math.random() * empty.length) | 0];
+    h.mole = makeMole();
+    sfx.pop();
+  }
+
+  // ====== こうしん（ろじっく）==================================================
+  function update(dt) {
+    if (state !== STATE.PLAYING) return;
+
+    // のこりじかん
+    timerAcc += dt;
+    if (timerAcc >= 1) {
+      timeLeft -= Math.floor(timerAcc);
+      timerAcc -= Math.floor(timerAcc);
+      if (timeLeft <= 0) { timeLeft = 0; updateHud(); endGame(); return; }
+      updateHud();
+    }
+
+    // もぐらの しゅつげん
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnMole();
+      spawnTimer = currentSpawnInterval();
+    }
+
+    // もぐらの じょうたい こうしん
+    for (const h of holes) {
+      const m = h.mole;
+      if (!m) continue;
+      m.t += dt;
+      if (m.shake > 0) m.shake = Math.max(0, m.shake - dt * 6);
+
+      if (m.state === "rising") {
+        if (m.t >= 0.18) { m.state = "up"; m.t = 0; }
+      } else if (m.state === "up") {
+        if (m.t >= m.life) { m.state = "falling"; m.t = 0; }
+      } else if (m.state === "falling") {
+        if (m.t >= 0.18) h.mole = null;
+      } else if (m.state === "hit") {
+        if (m.t >= 0.28) h.mole = null;
+      }
+    }
+
+    // えんしゅつ
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const e = effects[i];
+      e.t += dt;
+      e.y -= 40 * dt;
+      if (e.t >= e.dur) effects.splice(i, 1);
+    }
+
+    // ハンマー
+    if (hammer.swing > 0) hammer.swing = Math.max(0, hammer.swing - dt * 8);
+  }
+
+  // もぐらの「でかた」（0=あなの なか, 1=いちばん うえ）
+  function moleRise(m) {
+    if (m.state === "rising") return easeOut(Math.min(1, m.t / 0.18));
+    if (m.state === "up") return 1;
+    if (m.state === "falling") return 1 - easeIn(Math.min(1, m.t / 0.18));
+    if (m.state === "hit") return 1 - easeIn(Math.min(1, m.t / 0.28));
+    return 0;
+  }
+  const easeOut = t => 1 - (1 - t) * (1 - t);
+  const easeIn = t => t * t;
+
+  // ====== えがく（びょうが）====================================================
+  function draw() {
+    // はいけい（くさはら）
+    ctx.fillStyle = "#bfe66a";
+    ctx.fillRect(0, 0, W, H);
+    drawGrassTexture();
+
+    // あな ＆ もぐら（おくから まえへ）
+    for (const h of holes) drawHole(h);
+
+    // えんしゅつ（とくてん ひょうじ）
+    for (const e of effects) drawEffect(e);
+
+    // ハンマー
+    if (state === STATE.PLAYING && hammer.visible) drawHammer();
+  }
+
+  function drawGrassTexture() {
+    ctx.save();
+    ctx.strokeStyle = "rgba(120,190,70,0.5)";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 97 % W);
+      const y = ((i * 53) % (H - 40)) + 30;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 4, y - 12);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 4, y - 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHole(h) {
+    const { x, y, rx, ry } = h;
+
+    // あなの かげ（おく）
+    ctx.save();
+    ctx.fillStyle = "#7a4a22";
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#5e3517";
+    ctx.beginPath();
+    ctx.ellipse(x, y - 2, rx * 0.86, ry * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // もぐら（あなの なかから でてくるように クリップ）
+    const m = h.mole;
+    if (m) {
+      const rise = moleRise(m);
+      ctx.save();
+      // あなの じょうはんぶんだけ ひょうじ（した は あなに かくれる）
+      ctx.beginPath();
+      ctx.rect(x - rx - 20, 0, (rx + 20) * 2, y + ry * 0.2);
+      ctx.clip();
+      const shakeX = m.shake > 0 ? Math.sin(m.t * 60) * 6 * m.shake : 0;
+      drawMole(x + shakeX, y, rise, m);
+      ctx.restore();
+    }
+
+    // あなの まえの ふち（3Dっぽく）
+    ctx.save();
+    ctx.strokeStyle = "#6b3e1d";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI, false);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, Math.PI, Math.PI * 2, false);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawMole(cx, baseY, rise, m) {
+    // rise=0 のとき あなの なか、rise=1 で いちばん うえ
+    const peek = 70;                 // でる たかさ
+    const cy = baseY + 30 - rise * peek;
+    const bodyR = 52;
+    const gold = m.kind === "gold";
+    const hit = m.state === "hit";
+
+    // からだ
+    const bodyColor = gold ? "#f6c83a" : "#9b6b43";
+    const bellyColor = gold ? "#fff0b8" : "#d9b38c";
+
+    ctx.save();
+    // たたかれたら ぺちゃんこ
+    if (hit) {
+      const f = Math.min(1, m.t / 0.28);
+      ctx.translate(cx, cy + bodyR * 0.3);
+      ctx.scale(1 + f * 0.3, 1 - f * 0.6);
+      ctx.translate(-cx, -(cy + bodyR * 0.3));
+    }
+
+    // からだ（まるい）
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, bodyR, bodyR * 1.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // おなか
+    ctx.fillStyle = bellyColor;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 14, bodyR * 0.6, bodyR * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // みみ
+    ctx.fillStyle = bodyColor;
+    [-1, 1].forEach(s => {
+      ctx.beginPath();
+      ctx.ellipse(cx + s * bodyR * 0.7, cy - bodyR * 0.6, 12, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // め
+    if (hit) {
+      // ＞＜ の め
+      ctx.strokeStyle = "#3a2410";
+      ctx.lineWidth = 4;
+      [-1, 1].forEach(s => {
+        const ex = cx + s * 20;
+        ctx.beginPath();
+        ctx.moveTo(ex - 8, cy - 18); ctx.lineTo(ex, cy - 12); ctx.lineTo(ex - 8, cy - 6);
+        ctx.moveTo(ex + 8, cy - 18); ctx.lineTo(ex, cy - 12); ctx.lineTo(ex + 8, cy - 6);
+        ctx.stroke();
+      });
+    } else {
+      [-1, 1].forEach(s => {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.ellipse(cx + s * 20, cy - 14, 11, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#2a1a0c";
+        ctx.beginPath();
+        ctx.arc(cx + s * 20 + 2, cy - 12, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(cx + s * 20, cy - 15, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // はな
+    ctx.fillStyle = gold ? "#e08a2a" : "#caa6f0";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 4, 12, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ほっぺ
+    ctx.fillStyle = "rgba(255,120,120,0.5)";
+    [-1, 1].forEach(s => {
+      ctx.beginPath();
+      ctx.ellipse(cx + s * 34, cy + 4, 9, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // きんいろは おうかん
+    if (gold && !hit) {
+      ctx.fillStyle = "#ffdd55";
+      ctx.strokeStyle = "#d99a00";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const cyo = cy - bodyR - 6;
+      ctx.moveTo(cx - 22, cyo + 14);
+      ctx.lineTo(cx - 22, cyo);
+      ctx.lineTo(cx - 11, cyo + 8);
+      ctx.lineTo(cx, cyo - 6);
+      ctx.lineTo(cx + 11, cyo + 8);
+      ctx.lineTo(cx + 22, cyo);
+      ctx.lineTo(cx + 22, cyo + 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawEffect(e) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - e.t / e.dur);
+    ctx.fillStyle = e.color;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 5;
+    ctx.font = "900 40px 'Hiragino Maru Gothic ProN', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeText(e.text, e.x, e.y);
+    ctx.fillText(e.text, e.x, e.y);
+    ctx.restore();
+  }
+
+  function drawHammer() {
+    const { x, y, swing } = hammer;
+    const angle = -0.5 + swing * 1.2; // ふりおろし
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    // え（ハンドル）
+    ctx.fillStyle = "#8a5a2b";
+    ctx.fillRect(-7, 0, 14, 70);
+    // あたま
+    ctx.fillStyle = "#d23f3f";
+    roundRect(-34, -34, 68, 44, 10);
+    ctx.fill();
+    ctx.fillStyle = "#b62f2f";
+    roundRect(-34, -34, 16, 44, 8);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    roundRect(-30, -30, 50, 10, 5);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ====== にゅうりょく（タップ／クリック／キー）================================
+  function canvasPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const src = evt.touches ? evt.touches[0] : evt;
+    const x = (src.clientX - rect.left) / rect.width * W;
+    const y = (src.clientY - rect.top) / rect.height * H;
+    return { x, y };
+  }
+
+  function hitTest(px, py) {
+    // あなを まえ（した）から しらべる。でている もぐらだけ あたる
+    for (let i = holes.length - 1; i >= 0; i--) {
+      const h = holes[i];
+      const m = h.mole;
+      if (!m || m.state === "hit" || m.state === "falling") continue;
+      const rise = moleRise(m);
+      if (rise < 0.35) continue; // でかけは あたらない
+      const cy = h.y + 30 - rise * 70;
+      const dx = (px - h.x) / 56;
+      const dy = (py - cy) / 60;
+      if (dx * dx + dy * dy <= 1) return h;
+    }
+    return null;
+  }
+
+  function whack(px, py) {
+    if (state !== STATE.PLAYING) return;
+    hammer.x = px; hammer.y = py; hammer.visible = true; hammer.swing = 1;
+    const h = hitTest(px, py);
+    if (h) {
+      const m = h.mole;
+      m.state = "hit"; m.t = 0; m.hit = true;
+      score += m.points;
+      updateHud();
+      if (m.kind === "gold") { sfx.bonus(); pushEffect(h.x, h.y - 30, "+3", "#ff9f1c"); }
+      else { sfx.whack(); pushEffect(h.x, h.y - 30, "+1", "#2e9e5b"); }
+    } else {
+      sfx.miss();
+    }
+  }
+
+  function pushEffect(x, y, text, color) {
+    effects.push({ x, y, text, color, t: 0, dur: 0.7 });
+  }
+
+  function onPress(evt) {
+    evt.preventDefault();
+    ensureAudio();
+    const p = canvasPos(evt);
+    whack(p.x, p.y);
+  }
+  function onMove(evt) {
+    if (state !== STATE.PLAYING) return;
+    const p = canvasPos(evt);
+    hammer.x = p.x; hammer.y = p.y; hammer.visible = true;
+  }
+
+  canvas.addEventListener("mousedown", onPress);
+  canvas.addEventListener("mousemove", onMove);
+  canvas.addEventListener("touchstart", onPress, { passive: false });
+  canvas.addEventListener("touchmove", (e) => { e.preventDefault(); onMove(e); }, { passive: false });
+
+  // キーボード（1〜9 で あなを たたく）
+  window.addEventListener("keydown", (e) => {
+    if (state !== STATE.PLAYING) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= 9) {
+      const h = holes[n - 1];
+      whack(h.x, h.y + 30 - 70);
+    }
+  });
+
+  // ====== ボタンるい =========================================================
+  document.getElementById("start-btn").addEventListener("click", startGame);
+  document.getElementById("retry-btn").addEventListener("click", startGame);
+  document.getElementById("sound-btn").addEventListener("click", () => {
+    soundOn = !soundOn;
+    ensureAudio();
+    document.getElementById("sound-btn").textContent = soundOn ? "🔊" : "🔇";
+  });
+
+  // ====== HUD ＆ ハイスコア ====================================================
+  function updateHud() {
+    document.getElementById("time").textContent = timeLeft;
+    document.getElementById("score").textContent = score;
+  }
+  function loadHighScore() {
+    try { return parseInt(localStorage.getItem("mogura_high") || "0", 10) || 0; }
+    catch (_) { return 0; }
+  }
+  function saveHighScore(v) {
+    try { localStorage.setItem("mogura_high", String(v)); } catch (_) {}
+  }
+
+  // ====== めいんるーぷ ========================================================
+  function loop(ts) {
+    if (!lastTs) lastTs = ts;
+    let dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if (dt > 0.05) dt = 0.05; // タブを はなれた ときの ぼうし
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
