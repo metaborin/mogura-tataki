@@ -30,9 +30,20 @@ function worker() {
 
 test('activation deletes only versioned caches owned by this app', async () => {
   const w = worker(); let task;
+  w.handlers.install({ waitUntil: (promise) => { task = promise; } }); await task;
+  for (const request of w.added) w.entries.set(request.url, new Response('cached asset'));
   w.handlers.activate({ waitUntil: (promise) => { task = promise; } });
   await task;
   assert.deepEqual(w.deleted, ['mogura-tataki-precache-v0', 'mogura-tataki-precache-v20']);
+});
+
+test('activation preserves older caches when a waiting version loses an asset', async () => {
+  const w = worker(); let task;
+  w.handlers.install({ waitUntil: (promise) => { task = promise; } }); await task;
+  for (const request of w.added) w.entries.set(request.url, new Response('cached asset'));
+  w.entries.delete(w.added[0].url);
+  w.handlers.activate({ waitUntil: (promise) => { task = promise; } }); await task;
+  assert.deepEqual(w.deleted, []);
 });
 
 test('installation lists every offline dependency within the app scope', async () => {

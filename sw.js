@@ -8,6 +8,13 @@ const ASSETS = [
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png',
 ].map((path) => new URL(path, SCOPE).href);
 
+async function offlineComplete() {
+  if (!(await caches.keys()).includes(CACHE)) return false;
+  const cache = await caches.open(CACHE);
+  const responses = await Promise.all(ASSETS.map((url) => cache.match(url)));
+  return responses.every((response) => response && response.ok);
+}
+
 self.addEventListener('install', (event) => {
   // Installation succeeds only after every required local asset has been saved.
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(
@@ -16,9 +23,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.keys().then((names) => Promise.all(
-    names.filter((name) => name !== CACHE && OWN_CACHE.test(name)).map((name) => caches.delete(name)),
-  )));
+  event.waitUntil((async () => {
+    // Storage may be evicted while this version waits. Keep the older cache then.
+    if (!(await offlineComplete())) return;
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name !== CACHE && OWN_CACHE.test(name))
+      .map((name) => caches.delete(name)));
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
@@ -42,8 +53,7 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type !== 'CHECK_OFFLINE' || !event.ports[0]) return;
-  event.waitUntil(caches.open(CACHE).then(async (cache) => {
-    const responses = await Promise.all(ASSETS.map((url) => cache.match(url)));
-    event.ports[0].postMessage({ type: 'OFFLINE_STATUS', ready: responses.every(Boolean), version: CACHE });
+  event.waitUntil(offlineComplete().then((ready) => {
+    event.ports[0].postMessage({ type: 'OFFLINE_STATUS', ready, version: CACHE });
   }).catch(() => event.ports[0].postMessage({ type: 'OFFLINE_STATUS', ready: false })));
 });
