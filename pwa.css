@@ -1,0 +1,20 @@
+/* PWA controls stay outside the game board. */
+#app { padding: 8px 0; }
+#stage { width: min(94vw, 560px, calc((100dvh - 230px) * 0.9375)); }
+footer { max-width: 94vw; text-align: center; }
+#pwa-panel { width: min(94vw, 560px); text-align: center; font-size: 12px; line-height: 1.4; }
+#pwa-panel p { margin: 7px 0; }
+.pwa-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.pwa-button { min-height: 36px; padding: 7px 12px; border: 2px solid #795129; border-radius: 12px; background: #fff7e6; color: #4c3018; font: inherit; font-weight: 700; cursor: pointer; }
+.pwa-button:focus-visible { outline: 3px solid #185796; outline-offset: 3px; }
+.pwa-button:disabled { opacity: .65; cursor: default; }
+[hidden] { display: none !important; }
+#pwa-update { padding: 6px 9px; border-radius: 10px; background: #fff1be; color: #4c3018; }
+#pwa-dialog { width: min(92vw, 510px); max-height: 85dvh; overflow: auto; padding: 22px; border: 3px solid #795129; border-radius: 20px; color: #4c3018; background: #fff7e6; font-size: 15px; line-height: 1.65; }
+#pwa-dialog h2 { margin-top: 0; font-size: 21px; }
+#pwa-dialog::backdrop { background: rgb(42 33 21 / 55%); }
+#pwa-dialog form { text-align: right; }
+@media (max-height: 600px) {
+  #app { justify-content: flex-start; overflow-y: auto; }
+  #stage { width: min(80vw, 360px); }
+}

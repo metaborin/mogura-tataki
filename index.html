@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>ぽかぽか もぐらたたき</title>
+<meta name="theme-color" content="#bfe66a" />
+<meta name="description" content="30びょうで あそべる、ぽかぽか もぐらたたき。タップや キーボードで あそぼう。" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icons/icon-192.png" type="image/png" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
 <style>
   :root {
     --sky1: #aee9ff;
@@ -162,6 +167,7 @@
   }
   footer a { color: inherit; }
 </style>
+<link rel="stylesheet" href="./pwa.css" />
 </head>
 <body>
   <div id="app">
@@ -199,7 +205,24 @@
     </div>
 
     <footer>そうさ：もぐらを クリック／タップ ・ キーボードの 1〜9 でも あそべるよ</footer>
+    <section id="pwa-panel" aria-label="アプリと オフライン">
+      <p id="pwa-status" role="status">オフラインの じゅんびを しているよ…</p>
+      <div class="pwa-actions">
+        <button id="pwa-install" class="pwa-button" hidden>アプリを ついか</button>
+        <button id="pwa-help" class="pwa-button">アプリの つかいかた</button>
+      </div>
+      <p id="pwa-update" role="status" hidden>あたらしい ばんが あるよ。ゲームの あとで、このゲームの タブと アプリを すべて とじて、ひらきなおすと こうしんされるよ。</p>
+    </section>
   </div>
+  <dialog id="pwa-dialog" aria-labelledby="pwa-dialog-title">
+    <h2 id="pwa-dialog-title">アプリの つかいかた</h2>
+    <p>「アプリを ついか」が でたら、おすと この たんまつに ついかできるよ。</p>
+    <p>ボタンが ない ときは、Chrome・Edgeの メニューで「アプリを インストール」を さがしてね。iPhone・iPadでは Safariの「きょうゆう」から「ホームがめんに ついか」を えらんでね。ブラウザに よって、つかえない ことも あるよ。</p>
+    <p>さいしょは インターネットに つないで、「オフラインの じゅんびが できたよ」が でるまで まってね。その あとは、つうしんが なくても あそべるよ。</p>
+    <p>ハイスコアは この ブラウザに のこるよ。ブラウザの データを けすと、ハイスコアや オフラインの じゅんびも きえる ことが あるよ。</p>
+    <p>こうしんの おしらせが でたら、ゲームの あとで、このゲームの タブと アプリを すべて とじてから ひらきなおしてね。あそんでいる とちゅうで、かってに こうしんする ことは ないよ。</p>
+    <form method="dialog"><button class="pwa-button">とじる</button></form>
+  </dialog>
 
 <script>
 (() => {
@@ -330,6 +353,7 @@
     effects.length = 0;
     holes.forEach(h => h.mole = null);
     state = STATE.PLAYING;
+    document.dispatchEvent(new CustomEvent("mogura:playing", { detail: true }));
     document.getElementById("start-screen").classList.add("hidden");
     document.getElementById("result-screen").classList.add("hidden");
     updateHud();
@@ -337,6 +361,7 @@
 
   function endGame() {
     state = STATE.OVER;
+    document.dispatchEvent(new CustomEvent("mogura:playing", { detail: false }));
     holes.forEach(h => h.mole = null);
     sfx.end();
     if (score > highScore) { highScore = score; saveHighScore(highScore); }
@@ -758,5 +783,6 @@
   requestAnimationFrame(loop);
 })();
 </script>
+<script src="./pwa.js" defer></script>
 </body>
 </html>
